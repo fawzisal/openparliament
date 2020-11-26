@@ -17,10 +17,10 @@ current.py - parser for the Hansard format used from 2006 to the present
 old.py - (fairly crufty) parser for the format used from 1994 to 2006
 
 """
-import re, urllib, urllib2, datetime, sys, codecs
+import re, urllib.request, urllib.parse, urllib.error, urllib.request, urllib.error, urllib.parse, datetime, sys, codecs
 import pdb
 
-from BeautifulSoup import BeautifulSoup, Comment, NavigableString
+from bs4 import BeautifulSoup, Comment, NavigableString
 from django.db.models import Q
 from django.db import transaction
 
@@ -33,12 +33,12 @@ from parliament.imports.hans_old import current, old
 def qp(id):
     """Utility quick-parse function. Takes a Hansard ID"""
     return parseAndSave(Document.objects.get(pk=id))
-    
+
 def soup(id):
     cache = loadHansard(Hansard.objects.get(pk=id))
     parser = _getParser(cache.hansard, cache.getHTML())
     return parser.soup
-    
+
 def _getParser(hansard, html):
     if hansard.session.start.year < 2006:
         return old.HansardParser1994(hansard, html)
@@ -53,27 +53,27 @@ def parseAndSave(arg, auto_reparse=None):
         cache = arg
     else:
         raise Exception("Invalid argument to parseAndSave")
-        
+
     if Statement.objects.filter(hansard=cache.hansard).count() > 0:
         if not auto_reparse:
-            print "There are already Statements for %s." % cache.hansard
-            print "Delete them? (y/n) ",
+            print(("There are already Statements for %s.") % cache.hansard)
+            print(("Delete them? (y/n) "), end=' ')
             yn = sys.stdin.readline().strip()
             if yn != 'y':
                 return False
         for statement in Statement.objects.filter(hansard=cache.hansard):
             statement.delete()
-    
+
     parser = _getParser(cache.hansard, cache.getHTML())
-    
+
     statements = parser.parse()
     for statement in statements:
         #try:
         statement.save()
         statement.save_relationships()
         #except Exception, e:
-        #    print "Error saving statement: %s %s" % (statement.sequence, statement.who)
-        #    raise e 
+        #    print("Error saving statement: %s %s") % (statement.sequence, statement.who)
+        #    raise e
     return True
 
 def _getHansardNumber(page):
@@ -87,7 +87,7 @@ def _getHansardNumber(page):
             return re.sub('^0+', '', match.group(1))
         else:
             raise Exception("Couldn't parse number from Hansard title: %s" % title)
-            
+
 def hansards_from_calendar(session=None):
     if not session:
         session = Session.objects.current()
@@ -95,21 +95,21 @@ def hansards_from_calendar(session=None):
     'http://www2.parl.gc.ca/HousePublications/Publication.aspx?Language=E&Mode=2&Parl=36&Ses=2&DocId=2332160' : True,
     }
     url = 'http://www2.parl.gc.ca/housechamberbusiness/chambersittings.aspx?View=H&Parl=%d&Ses=%d&Language=E&Mode=2' % (session.parliamentnum, session.sessnum)
-    #print "Getting calendar..."
-    soup = BeautifulSoup(urllib2.urlopen(url))
-    #print "Calendar retrieved."
+    #print("Getting calendar...")
+    soup = BeautifulSoup(urllib.request.urlopen(url))
+    #print("Calendar retrieved.")
     cal = soup.find('div', id='ctl00_PageContent_calTextCalendar')
     for link in cal.findAll('a', href=True):
         hurl = 'http://www2.parl.gc.ca' + link['href']
         if hurl in SKIP_HANSARDS:
             continue
         hurl = hurl.replace('Mode=2&', 'Mode=1&')
-        #print "Loading url %s" % hurl
+        #print("Loading url %s") % hurl
         try:
             loadHansard(url=hurl, session=session)
-        except Exception, e:
-            print "Failure on %s: %s" % (hurl, e)            
-            
+        except Exception as e:
+            print(("Failure on %s: %s") % (hurl, e))
+
 def loadHansard(hansard=None, url=None, session=None):
     if hansard:
         try:
@@ -120,23 +120,23 @@ def loadHansard(hansard=None, url=None, session=None):
     elif url and session:
         normurl = parsetools.normalizeHansardURL(url)
         if normurl != url:
-            print "WARNING: Normalized URL %s to %s" % (url, normurl)
+            print(("WARNING: Normalized URL %s to %s") % (url, normurl))
         try:
             cached = HansardCache.objects.get(hansard__url=normurl)
             if cached.hansard.session != session:
                 raise Exception("Found cached Hansard, but session doesn't match...")
             return cached
         except HansardCache.DoesNotExist:
-            print "Downloading Hansard from %s" % normurl
-            req = urllib2.Request(normurl)
-            page = urllib2.urlopen(req).read()
+            print(("Downloading Hansard from %s") % normurl)
+            req = urllib.request.Request(normurl)
+            page = urllib.request.urlopen(req).read()
             #try:
             number = _getHansardNumber(page)
             #except Exception, e:
             #    print e
-            #    print "Couldn't get Hansard number for"
+            #    print("Couldn't get Hansard number for")
             #    print url
-            #    print "Please enter: ",
+            #    print("Please enter: "),
             #    number = sys.stdin.readline().strip()
             try:
                 hansard = Hansard.objects.get(session=session, number=number)

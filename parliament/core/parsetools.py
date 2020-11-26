@@ -1,7 +1,7 @@
 import re, unicodedata, decimal
 import datetime
 
-from BeautifulSoup import NavigableString
+from bs4 import NavigableString
 
 r_politicalpost = re.compile(r'(Minister|Leader|Secretary|Solicitor|Attorney|Speaker|Deputy |Soliciter|Chair |Parliamentary|President |for )')
 r_honorific = re.compile(r'^(Mr\.?|Mrs\.?|Ms\.?|Miss\.?|Hon\.?|Right Hon\.|The|A|An\.?|Some|M\.|One|Santa|Acting|L\'hon\.|Assistant|Mme)\s(.+)$', re.DOTALL | re.UNICODE)
@@ -34,34 +34,34 @@ def normalizeHansardURL(u):
     return 'http://www2.parl.gc.ca/HousePublications/Publication.aspx?Language=E&Mode=1&Parl=%s&Ses=%s&DocId=%s' % (parl, ses, docid)
 
 def removeAccents(str):
-    nkfd_form = unicodedata.normalize('NFKD', unicode(str))
-    return u"".join([c for c in nkfd_form if not unicodedata.combining(c)])
-    
+    nkfd_form = unicodedata.normalize('NFKD', str(str))
+    return "".join([c for c in nkfd_form if not unicodedata.combining(c)])
+
 def stripHonorific(s):
     for hon in ('The Honourable ', 'The Right Honourable ', 'The Rt. ', 'The '):
         s = s.replace(hon, '')
     return re.sub(r'^[A-Z][a-z]+\. ', '', s)
-    
+
 def isString(o):
     #return not hasattr(o, 'contents')
     return isinstance(o, NavigableString)
-    
+
 def titleIfNecessary(s):
     if not re.search(r'[a-z]', s):
         s = s.title()
     return s
-    
+
 r_hasText = re.compile(r'\S', re.UNICODE)
 def getText(tag):
-    return u''.join(tag.findAll(text=r_hasText))
+    return ''.join(tag.findAll(text=r_hasText))
 
-r_extraWhitespace = re.compile(r'\s\s*', re.UNICODE)    
+r_extraWhitespace = re.compile(r'\s\s*', re.UNICODE)
 def tameWhitespace(s):
-    return re.sub(r_extraWhitespace, u' ', s.replace(u"\n", u' '))
-    
+    return re.sub(r_extraWhitespace, ' ', s.replace("\n", ' '))
+
 def sane_quotes(s):
     return s.replace('``', '"').replace("''", '"')
-    
+
 def slugify(s, allow_numbers=False):
     if allow_numbers:
         pattern = r'[^a-zA-Z0-9]'
@@ -78,7 +78,7 @@ def munge_date(date):
         return None
     elif date == '':
         return None
-    elif date == u'&nbsp;':
+    elif date == '&nbsp;':
         return None
     else:
         return date
@@ -111,10 +111,10 @@ def munge_postcode (code):
         if re.search(r'^[ABCEGHJKLMNPRSTVXYZ]\d[A-Z] \d[A-Z]\d$', code):
             return code
     return None
-    
+
 def none_to_empty(s):
     return s if s is not None else ''
-    
+
 def etree_extract_text(elem):
     text = ''
     for x in elem.getiterator():

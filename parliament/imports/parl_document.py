@@ -8,10 +8,10 @@ called alpheus: http://github.com/rhymeswithcycle/alpheus
 from difflib import SequenceMatcher
 import re
 import sys
-import urllib2
+import urllib.request, urllib.error, urllib.parse
 from xml.sax.saxutils import quoteattr
 
-from django.core import urlresolvers
+import django.urls as urlresolvers
 from django.db import transaction
 from django.db.models import Max
 
@@ -40,7 +40,7 @@ def import_document(document, interactive=True, reimport_preserving_sequence=Fal
             if not interactive:
                 return
             sys.stderr.write("Statements already exist for %r.\nDelete them? (y/n) " % document)
-            if raw_input().strip() != 'y':
+            if input().strip() != 'y':
                 return
             document.statement_set.all().delete()
 
@@ -53,7 +53,7 @@ def import_document(document, interactive=True, reimport_preserving_sequence=Fal
     xml_fr = document.get_cached_xml('fr')
     pdoc_fr = alpheus.parse_file(xml_fr)
     xml_fr.close()
-    
+
     if document.date and document.date != pdoc_en.meta['date']:
         # Sometimes they get the date wrong
         if document.date != pdoc_fr.meta['date']:
@@ -85,7 +85,7 @@ def import_document(document, interactive=True, reimport_preserving_sequence=Fal
         try:
             s.who_hocid = int(pstate.meta['person_id']) if pstate.meta.get('person_id') else None
         except ValueError:
-            logger.warning(u"ValueError parsing person ID %s", pstate.meta['person_id'])
+            logger.warning("ValueError parsing person ID %s", pstate.meta['person_id'])
             s.who_hocid = None
         s.who_context_en = pstate.meta.get('person_context', '')[:300]
 
@@ -110,8 +110,8 @@ def import_document(document, interactive=True, reimport_preserving_sequence=Fal
     if len(statements) != len(pdoc_fr.statements):
         logger.info("French and English statement counts don't match for %r" % document)
 
-    _r_paragraphs = re.compile(ur'<p[^>]* data-HoCid=.+?</p>')
-    _r_paragraph_id = re.compile(ur'<p[^>]* data-HoCid="(?P<id>\d+)"')
+    _r_paragraphs = re.compile(r'<p[^>]* data-HoCid=.+?</p>')
+    _r_paragraph_id = re.compile(r'<p[^>]* data-HoCid="(?P<id>\d+)"')
     fr_paragraphs = dict()
     fr_statements = dict()
     missing_id_count = 0
@@ -182,7 +182,7 @@ def import_document(document, interactive=True, reimport_preserving_sequence=Fal
                 sequence=mapping[0],
                 slug=mapping[1]
             )
-        
+
     for s in statements:
         s.save()
 
@@ -227,7 +227,7 @@ def _align_sequences(new_statements, old_statements):
     mappings = []
     chosen = set()
 
-    for speaker, olds in old_speakers.items():
+    for speaker, olds in list(old_speakers.items()):
         news = new_speakers.get(speaker, [])
         if speaker and len(olds) == len(news):
             # The easy version: assume we've got the same statements
@@ -311,16 +311,16 @@ def _process_related_link(match, statement):
     }
     if title:
         attrs['title'] = title
-    return _build_tag(u'a', attrs) + text + u'</a>'
+    return _build_tag('a', attrs) + text + '</a>'
 
 def _build_tag(name, attrs):
-    return u'<%s%s>' % (
+    return '<%s%s>' % (
         name,
-        u''.join([u" %s=%s" % (k, quoteattr(unicode(v))) for k,v in sorted(attrs.items())])
+        ''.join([" %s=%s" % (k, quoteattr(str(v))) for k,v in sorted(attrs.items())])
     )
 
 def _test_has_paragraph_ids(elem):
-    """Do all, or almost all, of the paragraphs in this document have ID attributes? 
+    """Do all, or almost all, of the paragraphs in this document have ID attributes?
     Sometimes they're missing at first."""
     paratext = elem.xpath('//ParaText')
     paratext_with_id = [pt for pt in paratext if pt.get('id')]
@@ -362,7 +362,7 @@ def fetch_debate_for_sitting(session, sitting_number, import_without_paragraph_i
         if resp.status_code != 404:
             logger.error("Response %d from %s", resp.status_code, url)
         raise NoDocumentFound
-    print url
+    print(url)
 
     xml_en = resp.content
     url = HANSARD_URL.format(parliamentnum=session.parliamentnum,

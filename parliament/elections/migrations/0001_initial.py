@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+
 
 from django.db import migrations, models
 
@@ -18,8 +18,8 @@ class Migration(migrations.Migration):
                 ('occupation', models.CharField(max_length=100, blank=True)),
                 ('votetotal', models.IntegerField(null=True, blank=True)),
                 ('votepercent', models.DecimalField(null=True, max_digits=5, decimal_places=2, blank=True)),
-                ('elected', models.NullBooleanField()),
-                ('candidate', models.ForeignKey(to='core.Politician')),
+                ('elected', models.BooleanField(null=True)),
+                ('candidate', models.ForeignKey(to='core.Politician', on_delete=models.CASCADE)),
             ],
             options={
                 'verbose_name_plural': 'Candidacies',
@@ -39,16 +39,16 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='candidacy',
             name='election',
-            field=models.ForeignKey(to='elections.Election'),
+            field=models.ForeignKey(to='elections.Election', on_delete=models.CASCADE),
         ),
         migrations.AddField(
             model_name='candidacy',
             name='party',
-            field=models.ForeignKey(to='core.Party'),
+            field=models.ForeignKey(to='core.Party', on_delete=models.CASCADE),
         ),
         migrations.AddField(
             model_name='candidacy',
             name='riding',
-            field=models.ForeignKey(to='core.Riding'),
+            field=models.ForeignKey(to='core.Riding', on_delete=models.CASCADE),
         ),
     ]

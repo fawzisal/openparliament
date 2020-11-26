@@ -1,11 +1,11 @@
 import datetime
 import itertools
 import re
-from urllib import urlencode
+from urllib.parse import urlencode
 
 from django.conf import settings
 from django.contrib.syndication.views import Feed
-from django.core import urlresolvers
+import django.urls as urlresolvers
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator, InvalidPage, EmptyPage
 from django.http import HttpResponse, Http404, HttpResponsePermanentRedirect
@@ -164,7 +164,7 @@ class PoliticianView(ModelDetailView):
             'statements_politician_view': True,
             'show_statements': show_statements,
             'activities': activity.iter_recent(Activity.public.filter(politician=pol)),
-            'search_placeholder': u"Search %s in Parliament" % pol.name,
+            'search_placeholder': "Search %s in Parliament" % pol.name,
             'wordcloud_js': TextAnalysis.objects.get_wordcloud_js(
                 key=pol.get_absolute_url() + 'text-analysis/')
         }
@@ -188,7 +188,7 @@ def contact(request, pol_id=None, pol_slug=None):
     c = {
         'pol': pol,
         'info': pol.info(),
-        'title': u'Contact %s' % pol.name
+        'title': 'Contact %s' % pol.name
     }
     t = loader.get_template("politicians/contact.html")
     return HttpResponse(t.render(c, request))
@@ -215,7 +215,7 @@ class PoliticianAutocompleteView(JSONView):
                 'name', 'name_family', 'slug', 'id').order_by('name_family'))
 
         results = (
-            {'value': p['slug'] if p['slug'] else unicode(p['id']), 'label': p['name']}
+            {'value': p['slug'] if p['slug'] else str(p['id']), 'label': p['name']}
             for p in self.politician_list
             if p['name'].lower().startswith(q) or p['name_family'].lower().startswith(q)
         )
@@ -336,4 +336,4 @@ class PoliticianTextAnalysisView(TextAnalysisView):
             request.pol.set_info('favourite_word', word)
         return analysis
 
-analysis = PoliticianTextAnalysisView.as_view()   
+analysis = PoliticianTextAnalysisView.as_view()

@@ -1,11 +1,11 @@
 import json
-import urllib
-import urllib2
+import urllib.request, urllib.parse, urllib.error
+import urllib.request, urllib.error, urllib.parse
 from functools import wraps
 
 from django.db import models
 from django.conf import settings
-from django.core import urlresolvers
+import django.urls as urlresolvers
 from django.http import HttpResponsePermanentRedirect
 
 from compressor.filters import CompilerFilter
@@ -16,9 +16,9 @@ logger = logging.getLogger(__name__)
 
 def memoize_property(target):
     """Caches the result of a method that takes no arguments."""
-    
+
     cacheattr = '_cache_' + target.__name__
-    
+
     @wraps(target)
     def wrapped(self):
         if not hasattr(self, cacheattr):
@@ -33,42 +33,42 @@ def language_property(fieldname):
         fieldname = fieldname + '_en'
 
     return property(lambda self: getattr(self, fieldname))
-    
+
 def redir_view(view):
     """Function factory to redirect requests to the given view."""
-    
+
     def wrapped(request, *args, **kwargs):
         return HttpResponsePermanentRedirect(
             urlresolvers.reverse(view, args=args, kwargs=kwargs)
         )
     return wrapped
-    
+
 def get_twitter_share_url(url, description, add_plug=True):
     """Returns a URL for a Twitter post page, prepopulated with a sharing message.
-    
+
     url -- URL to the shared page -- should start with / and not include the domain
     description -- suggested content for sharing message
     add_plug -- if True, will add a mention of openparliament.ca, if there's room """
-    
+
     PLUG = ' (from openparliament.ca)'
-    
+
     longurl = settings.SITE_URL + url
-    
+
     try:
-        shorten_resp_raw = urllib2.urlopen(settings.BITLY_API_URL + urllib.urlencode({'longurl': longurl}))
+        shorten_resp_raw = urllib.request.urlopen(settings.BITLY_API_URL + urllib.parse.urlencode({'longurl': longurl}))
         shorten_resp = json.load(shorten_resp_raw)
         shorturl = shorten_resp['data']['url']
-    except Exception, e:
+    except Exception as e:
         # FIXME logging
         shorturl = longurl
-    
+
     if (len(description) + len(shorturl)) > 139:
         description = description[:136-len(shorturl)] + '...'
     elif add_plug and (len(description) + len(shorturl) + len(PLUG)) < 140:
         description += PLUG
     message = "%s %s" % (description, shorturl)
-    return 'http://twitter.com/home?' + urllib.urlencode({'status': message})
-    
+    return 'http://twitter.com/home?' + urllib.parse.urlencode({'status': message})
+
 #http://stackoverflow.com/questions/561486/how-to-convert-an-integer-to-the-shortest-url-safe-string-in-python
 import string
 ALPHABET = string.ascii_uppercase + string.ascii_lowercase + \
@@ -96,7 +96,7 @@ def int64_decode(s):
     for c in s:
         n = n * BASE + ALPHABET_REVERSE[c]
     return n
-        
+
 class ActiveManager(models.Manager):
 
     def get_queryset(self):

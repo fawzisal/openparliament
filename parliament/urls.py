@@ -34,22 +34,22 @@ urlpatterns = [
 
 if settings.DEBUG:
     urlpatterns += [
-        url(r'^admin/', include(admin.site.urls)),
+        url(r'^admin/', admin.site.urls),
     ]
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 if getattr(settings, 'ADMIN_URL', False):
     urlpatterns += [
-        url(settings.ADMIN_URL, include(admin.site.urls))
+        url(settings.ADMIN_URL, admin.site.urls)
     ]
-    
+
 if getattr(settings, 'PARLIAMENT_SITE_CLOSED', False):
     urlpatterns = [
         url(r'.*', closed)
     ] + urlpatterns
-    
+
 if getattr(settings, 'EXTRA_URL_INCLUDES', False):
     for url_pattern, url_include in settings.EXTRA_URL_INCLUDES:
         urlpatterns.append(url(url_pattern, include(url_include)))
-    
+
 handler500 = 'parliament.core.errors.server_error'

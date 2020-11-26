@@ -90,7 +90,7 @@ class APIView(View):
         try:
             result = handler(request, **kwargs)
         except BadRequest as e:
-            return HttpResponseBadRequest(escape(unicode(e)), content_type='text/plain')
+            return HttpResponseBadRequest(escape(str(e)), content_type='text/plain')
 
         processor = getattr(self, 'process_' + format, self.process_default)
         resp = processor(result, request, **kwargs)
@@ -113,7 +113,7 @@ class APIView(View):
     def process_json(self, result, request, **kwargs):
         if isinstance(result, HttpResponse):
             return result
-        
+
         pretty_print = (kwargs.pop('pretty_print')
             if kwargs.get('pretty_print') is not None
             else request.GET.get('indent'))
@@ -138,7 +138,7 @@ class APIView(View):
         kwargs['pretty_print'] = True
         content = self.process_json(result, request, **kwargs).content
         resource_name = getattr(self, 'resource_name', None)
-        title = resource_name if resource_name else u'API'
+        title = resource_name if resource_name else 'API'
         params = request.GET.copy()
         params['format'] = 'json'
         filters = [
@@ -187,14 +187,14 @@ class APIFilters(object):
                     (field_name if field_name else filter_name) + '__' + filter_extra: val
                 })
             except ValidationError as e:
-                raise BadRequest(unicode(e))
+                raise BadRequest(str(e))
         inner.help = help
         return inner
 
     @staticmethod
     def fkey(query_func, help=None):
         """Returns a filter function for a foreign-key field.
-        The required argument is a function that takes an array 
+        The required argument is a function that takes an array
         (the filter value split by '/'), and returns a dict of the ORM filters to apply.
         So a foreign key to a bill could accept an argument like
             "/bills/41-1/C-50"
@@ -228,7 +228,7 @@ class APIFilters(object):
             except StopIteration:
                 raise BadRequest("Invalid value for %s" % filter_name)
             return qs.filter(**{field_name: search_val})
-        inner.help = u', '.join(c[1] for c in choices)
+        inner.help = ', '.join(c[1] for c in choices)
         return inner
 
     @staticmethod
@@ -246,8 +246,8 @@ class ModelListView(APIView):
 
     default_limit = 20
 
-    resource_type = u'list'
-    
+    resource_type = 'list'
+
     def object_to_dict(self, obj):
         d = obj.to_api_dict(representation='list')
         if 'url' not in d:
@@ -258,7 +258,7 @@ class ModelListView(APIView):
         return self.model._default_manager.all()
 
     def filter(self, request, qs):
-        for (f, val) in request.GET.items():
+        for (f, val) in list(request.GET.items()):
             if val:
                 filter_name, _, filter_extra = f.partition('__')
                 if filter_name in getattr(self, 'filters', {}):

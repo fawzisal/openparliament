@@ -6,6 +6,7 @@
 *.pickle
 *.sublime-
 *.ipynb*
+*.py2
 .idea/
 .DS_Store
 models.dot

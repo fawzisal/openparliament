@@ -2,8 +2,8 @@ import datetime
 import logging
 import re
 import time
-import urllib2
-from urlparse import urljoin
+import urllib.request, urllib.error, urllib.parse
+from urllib.parse import urljoin
 
 from django.db import transaction
 
@@ -37,11 +37,11 @@ def import_committee_list(session=None):
             committee, created = Committee.objects.get_or_create(name_en=name_en,
                 name_fr=name_fr, parent=parent)
             if created:
-                logger.warning(u"Creating committee: %s, %s" % (committee.name_en, committee.slug))
+                logger.warning("Creating committee: %s, %s" % (committee.name_en, committee.slug))
             CommitteeInSession.objects.get_or_create(
                 committee=committee, session=session, acronym=acronym)
             return committee
-    
+
     resp = requests.get(COMMITTEE_LIST_URL.format(
         lang='en', parl=session.parliamentnum, sess=session.sessnum))
     resp.raise_for_status()
@@ -93,12 +93,12 @@ def import_committee_list(session=None):
 
     if not found:
         logger.error("No committees in list")
-            
+
     return True
 
 def _docid_from_url(u):
     return int(re.search(r'(Doc|publication)Id=(\d+)&', u).group(2))
-    
+
 def _12hr(hour, ampm):
     hour = int(hour)
     hour += 12 * bool('p' in ampm.lower())
@@ -106,7 +106,7 @@ def _12hr(hour, ampm):
         # noon, midnight
         hour -= 12
     return hour
-    
+
 def _parse_date(d):
     """datetime objects from e.g. March 11, 2011"""
     return datetime.date(
@@ -119,7 +119,7 @@ def import_committee_documents(session):
         # subcommittees last
         try:
             import_committee_meetings(comm, session)
-        except urllib2.HTTPError as e:
+        except urllib.error.HTTPError as e:
             logger.exception("Error importing committee %s", comm)
         #import_committee_reports(comm, session)
         #time.sleep(1)
@@ -133,7 +133,7 @@ def import_committee_meetings(committee, session):
         'parliamentnum': session.parliamentnum,
         'sessnum': session.sessnum,
         'domain': 'parl' if committee.joint else 'ourcommons'}
-    resp = urllib2.urlopen(url)
+    resp = urllib.request.urlopen(url)
     tree = lxml.html.parse(resp)
     root = tree.getroot()
     for mtg_row in root.cssselect('#meeting-accordion .accordion-item'):
@@ -162,7 +162,7 @@ def import_committee_meetings(committee, session):
         except CommitteeMeeting.DoesNotExist:
             meeting = CommitteeMeeting(committee=committee,
                 session=session, number=number)
-        
+
         if meeting.source_id:
             if meeting.source_id != source_id:
                 if meeting.evidence_id:
@@ -187,21 +187,21 @@ def import_committee_meetings(committee, session):
             meeting.date = datetime.date(int(match.group(1)), int(match.group(2)), int(match.group(3)))
         else:
             meeting.date = _parse_date(date_string.partition(', ')[2]) # partition is to split off day of week
-        
+
         timestring = mtg_row.cssselect('.the-time')[0].text_content()
         match = re.search(r'(\d\d?):(\d\d) ([ap]\.?m\.?)(?: - (\d\d?):(\d\d) ([ap]\.?m\.?))?\s\(',
             timestring, re.UNICODE)
         meeting.start_time = datetime.time(_12hr(match.group(1), match.group(3)), int(match.group(2)))
         if match.group(4):
             meeting.end_time = datetime.time(_12hr(match.group(4), match.group(6)), int(match.group(5)))
-        
+
         notice_link = mtg_row.cssselect('a.btn-meeting-notice')
         if notice_link:
             meeting.notice = 1
         minutes_link = mtg_row.cssselect('a.btn-meeting-minutes')
         if minutes_link:
             meeting.minutes = 1
-        
+
         evidence_link = mtg_row.cssselect('a.btn-meeting-evidence')
         if evidence_link and not meeting.evidence:
             evidence_viewer_url = urljoin(url, evidence_link[0].get('href'))
@@ -211,16 +211,16 @@ def import_committee_meetings(committee, session):
                 if acronym != 'REGS':
                     # REGS never has XML
                     logger.error("No XML evidence for %s", meeting)
-        
+
         meeting.webcast = bool(mtg_row.cssselect('.btn-meeting-parlvu'))
         meeting.in_camera = bool(mtg_row.cssselect('.meeting-title i[title*="In Camera"]'))
         if not meeting.televised:
             meeting.televised = bool(mtg_row.cssselect('.meeting-title .icon-television'))
         if not meeting.travel:
             meeting.travel = bool(mtg_row.cssselect('.meeting-title .icon-plane'))
-        
+
         meeting.save()
-        
+
         for study_link in mtg_row.cssselect('.meeting-card-study a'):
             name = study_link.text.strip()
             try:
@@ -230,7 +230,7 @@ def import_committee_meetings(committee, session):
             except:
                 logger.exception("Error fetching committee activity for %r %s %s",
                     committee, name, study_link.get('href'))
-    
+
     return True
 
 class NoXMLError(Exception):
@@ -279,7 +279,7 @@ def get_activity_by_url(activity_url, committee, session):
 
     activity = CommitteeActivity(committee=committee)
     activity.study = True # not parsing this at the moment
-    root = lxml.html.parse(urllib2.urlopen(activity_url)).getroot()
+    root = lxml.html.parse(urllib.request.urlopen(activity_url)).getroot()
 
     activity.name_en = root.cssselect('.core-content h2')[0].text.strip()[:500]
 
@@ -292,7 +292,7 @@ def get_activity_by_url(activity_url, committee, session):
         )
     except CommitteeActivity.DoesNotExist:
         url = activity_url.replace('/en/', '/fr/')
-        root = lxml.html.parse(urllib2.urlopen(url)).getroot()
+        root = lxml.html.parse(urllib.request.urlopen(url)).getroot()
         activity.name_fr = root.cssselect('.core-content h2')[0].text.strip()[:500]
         activity.save()
 
@@ -301,7 +301,7 @@ def get_activity_by_url(activity_url, committee, session):
         logger.info("Apparent duplicate activity ID for %s %s %s: %s" %
             (activity, activity.committee, session, activity_id))
         return activity
-    
+
     CommitteeActivityInSession.objects.create(
         session=session,
         activity=activity,
@@ -320,7 +320,7 @@ def get_activity_by_url(activity_url, committee, session):
 #         'parliamentnum': session.parliamentnum,
 #         'sessnum': session.sessnum}
 #     tree = lxml.html.parse(urllib2.urlopen(url))
-    
+
 #     def _import_report(report_link, parent=None):
 #         report_docid = _docid_from_url(report_link.get('href'))
 #         try:
@@ -348,7 +348,7 @@ def get_activity_by_url(activity_url, committee, session):
 #                 report.name_en = report_name
 #             report.name_en = report.name_en[:500]
 #             report.government_response = bool(report_link.xpath("../span[contains(., 'Government Response')]"))
-        
+
 #         match = re.search(r'Adopted by the Committee on ([a-zA-Z0-9, ]+)', report_link.tail or '')
 #         if match:
 #             report.adopted_date = _parse_date(match.group(1))
@@ -357,11 +357,11 @@ def get_activity_by_url(activity_url, committee, session):
 #             report.presented_date = _parse_date(match.group(1))
 #         report.save()
 #         return report
-            
+
 #     for item in tree.getroot().cssselect('.TocReportItemText'):
 #         report_link = item.xpath('./a')[0]
 #         report = _import_report(report_link)
 #         for response_link in item.cssselect('.TocResponseItemText a'):
 #             _import_report(response_link, parent=report)
-            
+
 #     return True

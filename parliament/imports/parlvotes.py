@@ -23,7 +23,7 @@ def import_votes(session=None):
         session = Session.objects.current()
     elif session != Session.objects.current():
         raise Exception("FIXME only current session supported in VOTELIST_URL for now")
-    
+
     votelisturl_en = VOTELIST_URL.format(lang='en')
     resp = requests.get(votelisturl_en)
     resp.raise_for_status()
@@ -39,7 +39,7 @@ def import_votes(session=None):
         votenumber = int(vote.findtext('DecisionDivisionNumber'))
         if VoteQuestion.objects.filter(session=session, number=votenumber).count():
             continue
-        print "Processing vote #%s" % votenumber
+        print(("Processing vote #%s") % votenumber)
         date = vote.findtext('DecisionEventDateTime')
         date = datetime.datetime.strptime(date, '%Y-%m-%dT%H:%M:%S').date()
         votequestion = VoteQuestion(

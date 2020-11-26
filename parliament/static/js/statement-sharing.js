@@ -98,7 +98,7 @@
     .on('click', '.facebook', function(e) {
       e.preventDefault();
       OP.utils.openShareWindow('https://facebook.com/sharer.php?'
-        + $.param({'u': $element.find('.statement-url').val(),
+        + $.param({'': $element.find('.statement-url').val(),
         't': _statementDescription()}));
     })
     .on('click', '.statement-url-group', function(e) {

@@ -1,5 +1,5 @@
 import re
-import urllib2
+import urllib.request, urllib.error, urllib.parse
 
 import lxml.html
 from lxml.html.clean import clean
@@ -15,7 +15,7 @@ def get_bill_text_element(bill_or_url):
     if hasattr(bill_or_url, 'get_billtext_url'):
         bill_or_url = bill_or_url.get_billtext_url(single_page=True)
 
-    resp = urllib2.urlopen(bill_or_url)
+    resp = urllib.request.urlopen(bill_or_url)
     root = lxml.html.parse(resp).getroot()
 
     is_two_columns = not root.cssselect('div.HeaderMenuLinks .HeaderLink a')

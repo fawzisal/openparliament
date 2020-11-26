@@ -5,12 +5,12 @@ It and parliament.financials were written in summer 2009
 and haven't been touched since. Not that they're not worthwhile--they're
 just looking for a home, and parents.
 """
-import urllib, urllib2
+import urllib.request, urllib.parse, urllib.error, urllib.request, urllib.error, urllib.parse
 from xml.etree.ElementTree import ElementTree
 import re, datetime
 import decimal
 
-from BeautifulSoup import BeautifulSoup
+from bs4 import BeautifulSoup
 from django.db import transaction
 
 from parliament.core import parsetools
@@ -48,27 +48,27 @@ POST_indivcontrib = {
 URL_indivcontrib = 'http://www.elections.ca/scripts/webpep/fin2/detail_report.aspx'
 
 def tmp_contribsoup():
-    postdata = urllib.urlencode(POST_indivcontrib)
-    request = urllib2.Request(URL_indivcontrib, postdata)
-    response = urllib2.urlopen(request)
+    postdata = urllib.parse.urlencode(POST_indivcontrib)
+    request = urllib.request.Request(URL_indivcontrib, postdata)
+    response = urllib.request.urlopen(request)
     return BeautifulSoup(response)
 
     def ec_indivContribRunner(election):
 
         while (True):
-            postdata = urllib.urlencode(POST_indivcontrib)
-            request = urllib2.Request(URL_indivcontrib, postdata, AGENT_HEADER)
-            print "Requesting page %d... " % POST_indivcontrib['page'],
-            response = urllib2.urlopen(request)
+            postdata = urllib.parse.urlencode(POST_indivcontrib)
+            request = urllib.request.Request(URL_indivcontrib, postdata, AGENT_HEADER)
+            print(("Requesting page %d... ") % POST_indivcontrib['page'], end=' ')
+            response = urllib.request.urlopen(request)
             soup = BeautifulSoup(response)
-            print "done."
+            print("done.")
             ec_indivContribPage(soup, election)
-            print "Checking for next link... ",
+            print(("Checking for next link... "), end=' ')
             if soup.find('a', href='javascript:ShowPage(-1);'):
-                print "found!"
+                print("found!")
                 POST_indivcontrib['page'] += 1
             else:
-                print "not found -- complete!"
+                print("not found -- complete!")
                 break
 
     @transaction.commit_on_success
@@ -92,8 +92,8 @@ def tmp_contribsoup():
                 raise Exception("Invalid name %s" % name)
             pname = name.title()
             url = CONTRIB_URL + re.sub(r'&amp;', '&', match.group(1))
-            req = urllib2.Request(url, headers=AGENT_HEADER)
-            response = urllib2.urlopen(req)
+            req = urllib.request.Request(url, headers=AGENT_HEADER)
+            response = urllib.request.urlopen(req)
             contribsoup = BeautifulSoup(response)
             (city, province, postcode) = (contribsoup.find('span', id='lblCity').string, contribsoup.find('span', id='lblProvince').string, parsetools.munge_postcode(contribsoup.find('span', id='lblPostalCode').string))
             if postcode:
@@ -113,12 +113,12 @@ def tmp_contribsoup():
             if len(cells) != 7:
                 raise Exception('Wrong number of cells in %s' % row)
 
-            # Get the contribution amount 
+            # Get the contribution amount
             amount_mon = parsetools.munge_decimal(cells[5].string)
             amount_non = parsetools.munge_decimal(cells[6].string)
             amount = amount_mon + amount_non
             if amount == 0:
-                print "WARNING: Zero amount -- %s and %s" % (cells[5].string, cells[6].string)
+                print(("WARNING: Zero amount -- %s and %s") % (cells[5].string, cells[6].string))
                 continue
 
             # Is there a date?
@@ -127,9 +127,9 @@ def tmp_contribsoup():
                     if cells[2].string.count('.') > 0:
                         date = datetime.datetime.strptime(cells[2].string, '%b. %d, %Y')
                     else:
-                        date = datetime.datetime.strptime(cells[2].string, '%b %d, %Y')                    
+                        date = datetime.datetime.strptime(cells[2].string, '%b %d, %Y')
                 except ValueError:
-                    print "WARNING: Unparsable date %s" % cells[2].string
+                    print(("WARNING: Unparsable date %s") % cells[2].string)
                     date = None
             else:
                 date = None
@@ -138,14 +138,14 @@ def tmp_contribsoup():
             # This is the unfortunately-long part
             recipient = cells[1].string.split(' / ')
             if len(recipient) != 3:
-                print "WARNING: Unparsable recipient: %s" % cells[1].string
+                print(("WARNING: Unparsable recipient: %s") % cells[1].string)
                 continue
             (cname, partyname, ridingname) = recipient
 
             # First, get the recipient's name
             cname = cname.split(', ')
             if len(cname) != 2:
-                print "WARNING: Couldn't parse candidate name %s" % recipient[0]
+                print(("WARNING: Couldn't parse candidate name %s") % recipient[0])
                 continue
             (last, first) = cname
 
@@ -153,14 +153,14 @@ def tmp_contribsoup():
             try:
                 riding = Riding.objects.get(name=ridingname)
             except Riding.DoesNotExist:
-                print "WARNING: Riding not found: %s" % ridingname
+                print(("WARNING: Riding not found: %s") % ridingname)
                 continue
 
-            # Get the recipient's party    
+            # Get the recipient's party
             try:
                 party = Party.objects.get(name=partyname)
             except Party.DoesNotExist:
-                print "CREATING party: %s" % partyname
+                print(("CREATING party: %s") % partyname)
                 party = Party(name=partyname)
                 party.save()
 
@@ -186,7 +186,7 @@ def tmp_contribsoup():
                         pol = possiblepols[0]
                     elif len(possiblepols) > 1:
                         # Two people, with the same name, elected from the same party!
-                        print "WARNING: Can't disambiguate politician %s" % recipient[0]
+                        print(("WARNING: Can't disambiguate politician %s") % recipient[0])
                         continue
                     else:
                         # let's create a new one for now
@@ -198,17 +198,17 @@ def tmp_contribsoup():
                 pol = candidacy.candidate
                 if pol.name != "%s %s" % (first, last):
                     # FIXME doesn't handle independents properly
-                    print "WARNING: Politician names don't match: %s and %s %s" % (pol.name, first, last)
+                    print(("WARNING: Politician names don't match: %s and %s %s") % (pol.name, first, last))
 
             # Finally, the contributor!
             if cells[0].contents[0].name != 'a':
-                print "WARNING: Can't parse contributor"
+                print("WARNING: Can't parse contributor")
                 continue
             contriblink = cells[0].contents[0]
             try:
                 contributor = get_contributor(contriblink['href'], contriblink.string)
-            except Exception, e:
-                print "WARNING: Error getting contributor: %s" % e
+            except Exception as e:
+                print(("WARNING: Error getting contributor: %s") % e)
                 continue
 
             # WE HAVE EVERYTHING!!!

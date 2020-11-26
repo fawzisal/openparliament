@@ -3,7 +3,7 @@ from collections import defaultdict
 import re
 
 from django.conf import settings
-from django.core import urlresolvers
+import django.urls as urlresolvers
 from django.db import models
 from django.utils.safestring import mark_safe
 
@@ -58,37 +58,37 @@ class BillManager(models.Manager):
             return bill
 
     def recently_active(self, number=12):
-        return Bill.objects.filter(status_date__isnull=False).exclude(models.Q(privatemember=True) 
+        return Bill.objects.filter(status_date__isnull=False).exclude(models.Q(privatemember=True)
             & models.Q(status_code='Introduced')).order_by('-status_date')[:number]
 
 
-class Bill(models.Model): 
+class Bill(models.Model):
     CHAMBERS = (
         ('C', 'House'),
         ('S', 'Senate'),
     )
     STATUS_CODES = {
-        u'BillNotActive': 'Not active',
-        u'WillNotBeProceededWith': 'Dead',
-        u'RoyalAssentAwaiting': 'Awaiting royal assent',
-        u'BillDefeated': 'Defeated',
-        u'HouseAtReportStage': 'Report stage (House)',
-        u'RoyalAssentGiven': 'Law (royal assent given)',
-        u'SenateAt1stReading': 'First reading (Senate)',
-        u'HouseAt1stReading': 'First reading (House)',
-        u'HouseAtReferralToCommitteeBeforeSecondReading': 'Referral to committee before 2nd reading (House)',
-        u'HouseAt2ndReading': 'Second reading (House)',
-        u'HouseAtReportStageAndSecondReading': 'Report stage and second reading (House)',
-        u'SenateAt2ndReading': 'Second reading (Senate)',
-        u'SenateAt3rdReading': 'Third reading (Senate)',
-        u'HouseAt3rdReading': 'Third reading (House)',
-        u'HouseInCommittee': 'In committee (House)',
-        u'SenateInCommittee': 'In committee (Senate)',
-        u'SenateConsiderationOfCommitteeReport': 'Considering committee report (Senate)',
-        u'HouseConsiderationOfCommitteeReport': 'Considering committee report (House)',
-        u'SenateConsiderationOfAmendments': 'Considering amendments (Senate)',
-        u'HouseConsiderationOfAmendments': 'Considering amendments (House)',
-        u'Introduced': 'Introduced'
+        'BillNotActive': 'Not active',
+        'WillNotBeProceededWith': 'Dead',
+        'RoyalAssentAwaiting': 'Awaiting royal assent',
+        'BillDefeated': 'Defeated',
+        'HouseAtReportStage': 'Report stage (House)',
+        'RoyalAssentGiven': 'Law (royal assent given)',
+        'SenateAt1stReading': 'First reading (Senate)',
+        'HouseAt1stReading': 'First reading (House)',
+        'HouseAtReferralToCommitteeBeforeSecondReading': 'Referral to committee before 2nd reading (House)',
+        'HouseAt2ndReading': 'Second reading (House)',
+        'HouseAtReportStageAndSecondReading': 'Report stage and second reading (House)',
+        'SenateAt2ndReading': 'Second reading (Senate)',
+        'SenateAt3rdReading': 'Third reading (Senate)',
+        'HouseAt3rdReading': 'Third reading (House)',
+        'HouseInCommittee': 'In committee (House)',
+        'SenateInCommittee': 'In committee (Senate)',
+        'SenateConsiderationOfCommitteeReport': 'Considering committee report (Senate)',
+        'HouseConsiderationOfCommitteeReport': 'Considering committee report (House)',
+        'SenateConsiderationOfAmendments': 'Considering amendments (Senate)',
+        'HouseConsiderationOfAmendments': 'Considering amendments (House)',
+        'Introduced': 'Introduced'
     }
 
     name_en = models.TextField(blank=True)
@@ -99,10 +99,10 @@ class Bill(models.Model):
     number_only = models.SmallIntegerField()
     institution = models.CharField(max_length=1, db_index=True, choices=CHAMBERS)
     sessions = models.ManyToManyField(Session, through='BillInSession')
-    privatemember = models.NullBooleanField()
-    sponsor_member = models.ForeignKey(ElectedMember, blank=True, null=True)
-    sponsor_politician = models.ForeignKey(Politician, blank=True, null=True)
-    law = models.NullBooleanField()
+    privatemember = models.BooleanField(null=True)
+    sponsor_member = models.ForeignKey(ElectedMember, blank=True, null=True, on_delete=models.CASCADE)
+    sponsor_politician = models.ForeignKey(Politician, blank=True, null=True, on_delete=models.CASCADE)
+    law = models.BooleanField(null=True)
 
     status_date = models.DateField(blank=True, null=True, db_index=True)
     status_code = models.CharField(max_length=50, blank=True)
@@ -111,25 +111,25 @@ class Bill(models.Model):
     introduced = models.DateField(blank=True, null=True)
     text_docid = models.IntegerField(blank=True, null=True,
         help_text="The parl.gc.ca document ID of the latest version of the bill's text")
-    
+
     objects = BillManager()
 
     name = language_property('name')
     short_title = language_property('short_title')
-   
+
     class Meta:
         ordering = ('privatemember', 'institution', 'number_only')
-    
+
     def __unicode__(self):
         return "%s - %s" % (self.number, self.name)
-        
+
     def get_absolute_url(self):
         return self.url_for_session(self.session)
 
     def url_for_session(self, session):
         return urlresolvers.reverse('bill', kwargs={
             'session_id': session.id, 'bill_number': self.number})
-        
+
     def get_legisinfo_url(self, lang='E'):
         return LEGISINFO_BILL_URL % {
             'lang': lang,
@@ -137,9 +137,9 @@ class Bill(models.Model):
             'parliament': self.session.parliamentnum,
             'session': self.session.sessnum
         }
-        
+
     legisinfo_url = property(get_legisinfo_url)
-        
+
     def get_billtext_url(self, lang='E', single_page=False):
         if not self.text_docid:
             return None
@@ -185,7 +185,7 @@ class Bill(models.Model):
     @property
     def latest_date(self):
         return self.status_date if self.status_date else self.introduced
-        
+
     def save(self, *args, **kwargs):
         if not self.number_only:
             self.number_only = int(re.sub(r'\D', '', self.number))
@@ -205,7 +205,7 @@ class Bill(models.Model):
                 date=self.introduced if self.introduced else (self.added - datetime.timedelta(days=1)),
                 variety='billsponsor',
             )
-        
+
     def get_session(self):
         """Returns the most recent session this bill belongs to."""
         try:
@@ -218,7 +218,7 @@ class Bill(models.Model):
         """To deal with tricky save logic, saves a session to the object for cases
         when self.sessions.all() won't get exist in the DB."""
         self._session = session
-        
+
     session = property(get_session)
 
     @property
@@ -253,20 +253,20 @@ class BillInSession(models.Model):
     reintroduced bills into a single Bill object. But it's this model
     that maps one-to-one to most IDs used elsewhere.
     """
-    bill = models.ForeignKey(Bill)
-    session = models.ForeignKey(Session)
+    bill = models.ForeignKey(Bill, on_delete=models.CASCADE)
+    session = models.ForeignKey(Session, on_delete=models.CASCADE)
 
     legisinfo_id = models.PositiveIntegerField(db_index=True, blank=True, null=True)
     introduced = models.DateField(blank=True, null=True, db_index=True)
-    sponsor_politician = models.ForeignKey(Politician, blank=True, null=True)
-    sponsor_member = models.ForeignKey(ElectedMember, blank=True, null=True)
+    sponsor_politician = models.ForeignKey(Politician, blank=True, null=True, on_delete=models.CASCADE)
+    sponsor_member = models.ForeignKey(ElectedMember, blank=True, null=True, on_delete=models.CASCADE)
 
     debates = models.ManyToManyField('hansards.Document', through='BillEvent')
 
     objects = BillInSessionManager()
 
     def __unicode__(self):
-        return u"%s in session %s" % (self.bill, self.session_id)
+        return "%s in session %s" % (self.bill, self.session_id)
 
     def get_absolute_url(self):
         return self.bill.url_for_session(self.session)
@@ -281,7 +281,7 @@ class BillInSession(models.Model):
         d = {
             'session': self.session_id,
             'legisinfo_id': self.legisinfo_id,
-            'introduced': unicode(self.introduced) if self.introduced else None,
+            'introduced': str(self.introduced) if self.introduced else None,
             'name': {
                 'en': self.bill.name_en,
                 'fr': self.bill.name_fr
@@ -310,7 +310,7 @@ class BillInSession(models.Model):
 
 
 class BillEvent(models.Model):
-    bis = models.ForeignKey(BillInSession)
+    bis = models.ForeignKey(BillInSession, on_delete=models.CASCADE)
 
     date = models.DateField(db_index=True)
 
@@ -327,7 +327,7 @@ class BillEvent(models.Model):
     status = language_property('status')
 
     def __unicode__(self):
-        return u"%s: %s, %s" % (self.status, self.bis.bill.number, self.date)
+        return "%s: %s, %s" % (self.status, self.bis.bill.number, self.date)
 
     @property
     def bill_number(self):
@@ -336,7 +336,7 @@ class BillEvent(models.Model):
 
 class BillText(models.Model):
 
-    bill = models.ForeignKey(Bill)
+    bill = models.ForeignKey(Bill, on_delete=models.CASCADE)
     docid = models.PositiveIntegerField(unique=True, db_index=True)
 
     created = models.DateTimeField(default=datetime.datetime.now)
@@ -347,7 +347,7 @@ class BillText(models.Model):
     text = language_property('text')
 
     def __unicode__(self):
-        return u"Document #%d for %s" % (self.docid, self.bill)
+        return "Document #%d for %s" % (self.docid, self.bill)
 
     @property
     def summary(self):
@@ -361,16 +361,16 @@ class BillText(models.Model):
             return ''
         return mark_safe('<p>' + summary.replace('\n', '</p><p>') + '</p>')
 
-        
+
 VOTE_RESULT_CHOICES = (
     ('Y', 'Passed'), # Agreed to
     ('N', 'Failed'), # Negatived
     ('T', 'Tie'),
 )
 class VoteQuestion(models.Model):
-    
-    bill = models.ForeignKey(Bill, blank=True, null=True)
-    session = models.ForeignKey(Session)
+
+    bill = models.ForeignKey(Bill, blank=True, null=True, on_delete=models.CASCADE)
+    session = models.ForeignKey(Session, on_delete=models.CASCADE)
     number = models.PositiveIntegerField()
     date = models.DateField(db_index=True)
     description_en = models.TextField()
@@ -383,10 +383,10 @@ class VoteQuestion(models.Model):
         blank=True, null=True, on_delete=models.SET_NULL)
 
     description = language_property('description')
-    
+
     def __unicode__(self):
-        return u"Vote #%s on %s" % (self.number, self.date)
-        
+        return "Vote #%s on %s" % (self.number, self.date)
+
     class Meta:
         ordering=('-date', '-number')
 
@@ -395,7 +395,7 @@ class VoteQuestion(models.Model):
             'bill_url': self.bill.get_absolute_url() if self.bill else None,
             'session': self.session_id,
             'number': self.number,
-            'date': unicode(self.date),
+            'date': str(self.date),
             'description': {'en': self.description_en, 'fr': self.description_fr},
             'result': self.get_result_display(),
             'yea_total': self.yea_total,
@@ -419,37 +419,37 @@ class VoteQuestion(models.Model):
     def label_absent_members(self):
         for member in ElectedMember.objects.on_date(self.date).exclude(membervote__votequestion=self):
             MemberVote(votequestion=self, member=member, politician_id=member.politician_id, vote='A').save()
-            
+
     def label_party_votes(self):
         """Create PartyVote objects representing the party-line vote; label individual dissenting votes."""
         membervotes = self.membervote_set.select_related('member', 'member__party').all()
         parties = defaultdict(lambda: defaultdict(int))
-        
+
         for mv in membervotes:
             if mv.member.party.name != 'Independent':
                 parties[mv.member.party][mv.vote] += 1
-        
+
         partyvotes = {}
         for party in parties:
             # Find the most common vote
-            votes = sorted(parties[party].items(), key=lambda i: i[1])
+            votes = sorted(list(parties[party].items()), key=lambda i: i[1])
             partyvotes[party] = votes[-1][0]
-            
+
             # Find how many people voted with the majority
             yn = (parties[party]['Y'], parties[party]['N'])
             try:
                 disagreement = float(min(yn))/sum(yn)
             except ZeroDivisionError:
                 disagreement = 0.0
-                
+
             # If more than 15% of the party voted against the party majority,
             # label this as a free vote.
             if disagreement >= 0.15:
                 partyvotes[party] = 'F'
-            
+
             PartyVote.objects.filter(party=party, votequestion=self).delete()
             PartyVote.objects.create(party=party, votequestion=self, vote=partyvotes[party], disagreement=disagreement)
-        
+
         for mv in membervotes:
             if mv.member.party.name != 'Independent' \
               and mv.vote != partyvotes[mv.member.party] \
@@ -457,11 +457,10 @@ class VoteQuestion(models.Model):
               and partyvotes[mv.member.party] in ('Y', 'N'):
                 mv.dissent = True
                 mv.save()
-            
-    @models.permalink
+
     def get_absolute_url(self):
-        return ('vote', [],
-            {'session_id': self.session_id, 'number': self.number})
+        return urlresolvers.reverse('vote', [],
+            args={'session_id': self.session_id, 'number': self.number})
 
 VOTE_CHOICES = [
     ('Y', 'Yes'),
@@ -470,16 +469,16 @@ VOTE_CHOICES = [
     ('A', "Didn't vote"),
 ]
 class MemberVote(models.Model):
-    
-    votequestion = models.ForeignKey(VoteQuestion)
-    member = models.ForeignKey(ElectedMember)
-    politician = models.ForeignKey(Politician)
+
+    votequestion = models.ForeignKey(VoteQuestion, on_delete=models.CASCADE)
+    member = models.ForeignKey(ElectedMember, on_delete=models.CASCADE)
+    politician = models.ForeignKey(Politician, on_delete=models.CASCADE)
     vote = models.CharField(max_length=1, choices=VOTE_CHOICES)
     dissent = models.BooleanField(default=False, db_index=True)
-    
+
     def __unicode__(self):
-        return u'%s voted %s on %s' % (self.politician, self.get_vote_display(), self.votequestion)
-            
+        return '%s voted %s on %s' % (self.politician, self.get_vote_display(), self.votequestion)
+
     def save_activity(self):
         activity.save_activity(self, politician=self.politician, date=self.votequestion.date)
 
@@ -492,16 +491,16 @@ class MemberVote(models.Model):
             'ballot': self.get_vote_display(),
         }
 
-VOTE_CHOICES_PARTY = VOTE_CHOICES + [('F', "Free vote")]            
+VOTE_CHOICES_PARTY = VOTE_CHOICES + [('F', "Free vote")]
 class PartyVote(models.Model):
-    
-    votequestion = models.ForeignKey(VoteQuestion)
-    party = models.ForeignKey(Party)
+
+    votequestion = models.ForeignKey(VoteQuestion, on_delete=models.CASCADE)
+    party = models.ForeignKey(Party, on_delete=models.CASCADE)
     vote = models.CharField(max_length=1, choices=VOTE_CHOICES_PARTY)
     disagreement = models.FloatField(null=True)
-    
+
     class Meta:
         unique_together = ('votequestion', 'party')
-    
+
     def __unicode__(self):
-        return u'%s voted %s on %s' % (self.party, self.get_vote_display(), self.votequestion)
+        return '%s voted %s on %s' % (self.party, self.get_vote_display(), self.votequestion)

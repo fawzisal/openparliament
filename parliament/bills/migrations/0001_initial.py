@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+
 
 from django.db import migrations, models
 import datetime
@@ -22,8 +22,8 @@ class Migration(migrations.Migration):
                 ('number', models.CharField(max_length=10)),
                 ('number_only', models.SmallIntegerField()),
                 ('institution', models.CharField(db_index=True, max_length=1, choices=[(b'C', b'House'), (b'S', b'Senate')])),
-                ('privatemember', models.NullBooleanField()),
-                ('law', models.NullBooleanField()),
+                ('privatemember', models.BooleanField(null=True)),
+                ('law', models.BooleanField(null=True)),
                 ('status_date', models.DateField(db_index=True, null=True, blank=True)),
                 ('status_code', models.CharField(max_length=50, blank=True)),
                 ('added', models.DateField(default=datetime.date.today, db_index=True)),
@@ -91,7 +91,7 @@ class Migration(migrations.Migration):
                 ('yea_total', models.SmallIntegerField()),
                 ('nay_total', models.SmallIntegerField()),
                 ('paired_total', models.SmallIntegerField()),
-                ('bill', models.ForeignKey(blank=True, to='bills.Bill', null=True)),
+                ('bill', models.ForeignKey(blank=True, to='bills.Bill', null=True, on_delete=models.CASCADE)),
             ],
             options={
                 'ordering': ('-date', '-number'),

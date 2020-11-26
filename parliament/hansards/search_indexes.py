@@ -22,7 +22,7 @@ class StatementIndex(indexes.SearchIndex, indexes.Indexable):
 
     def get_model(self):
         return Statement
-    
+
     def index_queryset(self, using=None):
         qs = Statement.objects.all().prefetch_related(
             'member__politician', 'member__party', 'member__riding', 'document',

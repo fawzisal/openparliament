@@ -2,7 +2,7 @@ from base64 import urlsafe_b64encode
 import datetime
 import os
 
-from django.core import urlresolvers
+import django.urls as urlresolvers
 from django.core.mail import send_mail
 from django.db import models
 from django.template import loader
@@ -60,7 +60,7 @@ class LoginToken(models.Model):
         login_url = urlresolvers.reverse('token_login', kwargs={'token': lt.token})
         ctx = {'login_url': login_url, 'email': email}
         t = loader.get_template("accounts/token_login.txt")
-        send_mail(subject=u'Log in to openparliament.ca',
+        send_mail(subject='Log in to openparliament.ca',
             message=t.render(ctx),
             from_email='alerts@contact.openparliament.ca',
             recipient_list=[email])

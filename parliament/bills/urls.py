@@ -1,5 +1,5 @@
 from django.conf.urls import url
-from django.core import urlresolvers
+import django.urls as urlresolvers
 from django.http import HttpResponsePermanentRedirect
 
 from parliament.bills.views import BillFeed, BillListFeed, bill, bills_for_session, index, bill_pk_redirect

@@ -1,16 +1,17 @@
 from django.conf import settings
 
-from oauth2client import client, crypt
+from google.oauth2 import id_token
+from google.auth.exceptions import GoogleAuthError
 
 from parliament.accounts.models import User
 from parliament.utils.views import JSONView
 
 def google_info_from_token(token):
-    idinfo = client.verify_id_token(token, settings.GOOGLE_CLIENT_ID)
+    idinfo = id_token.verify_token(token, settings.GOOGLE_CLIENT_ID)
     if idinfo['aud'] != settings.GOOGLE_CLIENT_ID:
-        raise crypt.AppIdentityError('aud dont match')
+        raise GoogleAuthError('aud dont match')
     if idinfo['iss'] not in ['accounts.google.com', 'https://accounts.google.com']:
-        raise crypt.AppIdentityError("Wrong issuer.")
+        raise GoogleAuthError("Wrong issuer.")
     return idinfo
 
 def get_user_from_google_token(token):

@@ -2,7 +2,7 @@
 Update MP biographical data from the lovely Represent API
 """
 
-from urlparse import urljoin
+from urllib.parse import urljoin
 from time import sleep
 
 from django.db import transaction
@@ -73,7 +73,7 @@ def update_mps_from_represent(download_headshots=False, update_all_headshots=Fal
             elif pol.info().get('twitter') != screen_name:
                 warnings.append("Potential twitter change for %s: existing %s new %s" % (
                     pol, pol.info()['twitter'], screen_name))
-    
+
     if errors:
         logger.error('\n\n'.join(errors))
     if warnings:

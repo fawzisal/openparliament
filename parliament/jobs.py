@@ -28,10 +28,10 @@ def googlenews():
     for pol in Politician.objects.current():
         gnews.save_politician_news(pol)
         #time.sleep(1)
-        
+
 def votes():
     parlvotes.import_votes()
-    
+
 def bills():
     legisinfo.import_bills(Session.objects.current())
 
@@ -46,14 +46,14 @@ def committee_evidence():
       .annotate(scount=models.Count('statement'))\
       .exclude(scount__gt=0).exclude(skip_parsing=True).order_by('date').iterator():
         try:
-            print document
+            print(document)
             parl_document.import_document(document, interactive=False)
             if document.statement_set.all().count():
                 document.save_activity()
-        except Exception, e:
+        except Exception as e:
             logger.exception("Evidence parse failure on #%s: %r" % (document.id, e))
             continue
-    
+
 def committees(sess=None):
     if sess is None:
         sess = Session.objects.current()
@@ -68,11 +68,11 @@ def committees(sess=None):
 def committees_full():
     committees()
     committee_evidence()
-    
+
 @transaction.atomic
 def hansards_load():
     parl_document.fetch_latest_debates()
-        
+
 def hansards_parse():
     for hansard in Document.objects.filter(document_type=Document.DEBATE)\
       .annotate(scount=models.Count('statement'))\
@@ -81,17 +81,17 @@ def hansards_parse():
             try:
                 with transaction.atomic():
                     parl_document.import_document(hansard, interactive=False)
-            except Exception, e:
+            except Exception as e:
                 logger.exception("Hansard parse failure on #%s: %r" % (hansard.id, e))
                 continue
             # now reload the Hansard to get the date
             hansard = Document.objects.get(pk=hansard.id)
             hansard.save_activity()
-            
+
 def hansards():
     hansards_load()
     hansards_parse()
-    
+
 def corpus_for_debates():
     corpora.generate_for_debates()
 

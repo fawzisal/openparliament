@@ -17,9 +17,9 @@ current.py - parser for the Hansard format used from 2006 to the present
 old.py - (fairly crufty) parser for the format used from 1994 to 2006
 
 """
-import re, urllib, urllib2, datetime, sys, codecs
+import re, urllib.request, urllib.parse, urllib.error, urllib.request, urllib.error, urllib.parse, datetime, sys, codecs
 
-from BeautifulSoup import BeautifulSoup, Comment, NavigableString
+from bs4 import BeautifulSoup, Comment, NavigableString
 from django.db.models import Q
 from django.db import transaction
 from django.utils.html import escape
@@ -61,7 +61,7 @@ STARTUP_RE_1994 = (
     # Deal with self-closing <a name> tags
     (re.compile(r'<a name="[^"]+" />'), ''),# we're just getting rid of them, since we don't care about them
     # And empty bold tags
-    (re.compile(r'</?b>(\s*)</?b>', re.I | re.UNICODE), r'\1'), 
+    (re.compile(r'</?b>(\s*)</?b>', re.I | re.UNICODE), r'\1'),
     # Another RE for empty bolds
     (re.compile(r'<b>[^\w\d<]+</b>', re.I | re.UNICODE), ' '),
     # And line breaks or <hr>
@@ -79,7 +79,7 @@ STARTUP_RE_2009 = (
     (re.compile(r'&nbsp;'), ' '),
     (re.compile(r'<div>\s*<b>\s*</b>\s*</div>', re.I | re.UNICODE), ' '), # <div><b></b></div>
     # Another RE for empty bolds
-    (re.compile(r'<b>[^\w\d<]*</b>', re.I | re.UNICODE), ''),    
+    (re.compile(r'<b>[^\w\d<]*</b>', re.I | re.UNICODE), ''),
 )
 
 
@@ -91,28 +91,28 @@ class ParseTracker(object):
         self._next = dict()
         self._textbuffer = []
         self._ignoretext = False
-        
+
     def __setitem__(self, key, val):
         self._current[key] = val
-    
+
     def setNext(self, key, val):
         self._next[key] = val
-        
+
     def __getitem__(self, key):
         try:
             return self._current[key]
         except KeyError:
             return None
-    
+
     def hasText(self):
         return len(self._textbuffer) >= 1
-        
+
     def ignoreText(self, ignore=True):
         self._ignoretext = ignore
-        
+
     def ignoringText(self):
         return self._ignoretext
-         
+
     def addText(self, text, blockquote=False):
         if not self._ignoretext:
             t = parsetools.tameWhitespace(text.strip())
@@ -126,27 +126,27 @@ class ParseTracker(object):
                 t = t[9:].strip()
             if len(t) > 0 and not t.isspace():
                 #if t[0].islower() and not t.startswith('moved'):
-                #    print "WARNING: Block of text begins with lowercase letter: %s" % t
+                #    print("WARNING: Block of text begins with lowercase letter: %s") % t
                 if blockquote or (t.startswith('moved ') and not self.hasText()):
-                    self._textbuffer.append(u'> ' + t)
+                    self._textbuffer.append('> ' + t)
                 else:
                     self._textbuffer.append(t)
-                    
+
     def appendToText(self, text, italic=False):
         if self.hasText() and not self._ignoretext:
             t = parsetools.tameWhitespace(text.strip())
             if len(t) > 0 and not t.isspace():
-                if italic: t = u' <em>' + t + u'</em> '
+                if italic: t = ' <em>' + t + '</em> '
                 self._textbuffer[-1] += t
-        
+
     def getText(self):
-        return u"\n\n".join(self._textbuffer)
-        
+        return "\n\n".join(self._textbuffer)
+
     def onward(self):
         self._textbuffer = []
         self._current = self._next.copy()
         self._ignoretext = False
-        
+
 class ParseException(Exception):
     pass
 
@@ -159,15 +159,15 @@ class HansardParser(object):
             html = re.sub(regex[0], regex[1], html)
 
         self.soup = BeautifulSoup(html, convertEntities='html')
-        
+
         # remove comments
         for t in self.soup.findAll(text=lambda x: isinstance(x, Comment)):
             t.extract()
-        
+
     def parse(self):
         self.statements = []
         self.statement_index = 0
-        
+
     def houseTime(self, number, ampm):
         ampm = ampm.replace('.', '')
         number = number.replace('.', ':')
@@ -178,7 +178,7 @@ class HansardParser(object):
         else:
             # "2 p.m."
             return datetime.datetime.strptime("%s %s" % (number, ampm), "%I %p").time()
-            
+
     def saveProceedingsStatement(self, text, t):
         text = parsetools.sane_quotes(parsetools.tameWhitespace(text.strip()))
         if len(text):
@@ -192,7 +192,7 @@ class HansardParser(object):
                 who='Proceedings')
             self.statement_index += 1
             self.statements.append(statement)
-        
+
     def saveStatement(self, t):
         def mcUp(match):
             return 'Mc' + match.group(1).upper()
@@ -204,7 +204,7 @@ class HansardParser(object):
         if t.hasText():
             if not t['member_title']:
                 t['member_title'] = 'Proceedings'
-                print "WARNING: No title for %s" % t.getText().encode('ascii', 'replace')
+                print(("WARNING: No title for %s") % t.getText().encode('ascii', 'replace'))
             timestamp = t['timestamp']
             if not isinstance(timestamp, datetime.datetime):
                 # The older parser provides only datetime.time objects
@@ -218,14 +218,14 @@ class HansardParser(object):
                 statement.speaker = True
             self.statement_index += 1
             self.statements.append(statement)
-            
+
             if ENABLE_PRINT:
-                print u"HEADING: %s" % t['heading']
-                print u"TOPIC: %s" % t['topic']
-                print u"MEMBER TITLE: %s" % t['member_title']
-                print u"MEMBER: %s" % t['member']
-                print u"TIME: %s" % t['timestamp']
-                print u"TEXT: %s" % t.getText()
+                print("HEADING: %s" % t['heading'])
+                print("TOPIC: %s" % t['topic'])
+                print("MEMBER TITLE: %s" % t['member_title'])
+                print("MEMBER: %s" % t['member'])
+                print("TIME: %s" % t['timestamp'])
+                print("TEXT: %s" % t.getText())
             if ENABLE_READLINE:
                 sys.stdin.readline()
         t.onward()

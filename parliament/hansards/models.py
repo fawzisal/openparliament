@@ -7,7 +7,7 @@ import re
 
 from django.db import models
 from django.conf import settings
-from django.core import urlresolvers
+import django.urls as urlresolvers
 from django.template.defaultfilters import slugify
 from django.utils.html import strip_tags
 from django.utils.safestring import mark_safe
@@ -44,20 +44,20 @@ def url_from_docid(docid):
     ) if docid else None
 
 class Document(models.Model):
-    
+
     DEBATE = 'D'
     EVIDENCE = 'E'
-    
+
     document_type = models.CharField(max_length=1, db_index=True, choices=(
         ('D', 'Debate'),
         ('E', 'Committee Evidence'),
     ))
     date = models.DateField(blank=True, null=True)
     number = models.CharField(max_length=6, blank=True) # there exist 'numbers' with letters
-    session = models.ForeignKey(Session)
-    
+    session = models.ForeignKey(Session, on_delete=models.CASCADE)
+
     source_id = models.IntegerField(unique=True, db_index=True)
-    
+
     most_frequent_word = models.CharField(max_length=20, blank=True)
     wordcloud = models.ImageField(upload_to='autoimg/wordcloud', blank=True, null=True)
 
@@ -73,17 +73,17 @@ class Document(models.Model):
     debates = DebateManager()
     evidence = EvidenceManager()
     without_statements = NoStatementManager()
-    
+
     class Meta:
         ordering = ('-date',)
-    
+
     def __unicode__ (self):
         if self.document_type == self.DEBATE:
-            return u"Hansard #%s for %s (#%s/#%s)" % (self.number, self.date, self.id, self.source_id)
+            return "Hansard #%s for %s (#%s/#%s)" % (self.number, self.date, self.id, self.source_id)
         else:
-            return u"%s evidence for %s (#%s/#%s)" % (
+            return "%s evidence for %s (#%s/#%s)" % (
                 self.committeemeeting.committee.short_name, self.date, self.id, self.source_id)
-        
+
     @memoize_property
     def get_absolute_url(self):
         if self.document_type == self.DEBATE:
@@ -99,7 +99,7 @@ class Document(models.Model):
 
     def to_api_dict(self, representation):
         d = dict(
-            date=unicode(self.date) if self.date else None,
+            date=str(self.date) if self.date else None,
             number=self.number,
             most_frequent_word={'en': self.most_frequent_word},
         )
@@ -119,7 +119,7 @@ class Document(models.Model):
     @property
     def source_url(self):
         return url_from_docid(self.source_id)
-        
+
     def _topics(self, l):
         topics = []
         last_topic = ''
@@ -128,15 +128,15 @@ class Document(models.Model):
                 last_topic = statement[0]
                 topics.append((statement[0], statement[1]))
         return topics
-        
+
     def topics(self):
         """Returns a tuple with (topic, statement slug) for every topic mentioned."""
         return self._topics(self.statement_set.all().values_list('h2_' + settings.LANGUAGE_CODE, 'slug'))
-        
+
     def headings(self):
         """Returns a tuple with (heading, statement slug) for every heading mentioned."""
         return self._topics(self.statement_set.all().values_list('h1_' + settings.LANGUAGE_CODE, 'slug'))
-    
+
     def topics_with_qp(self):
         """Returns the same as topics(), but with a link to Question Period at the start of the list."""
         statements = self.statement_set.all().values_list(
@@ -190,22 +190,22 @@ class Document(models.Model):
     def outside_speaker_summary(self):
         """Same as speaker_summary, but only non-MPs."""
         return OrderedDict(
-            [(k, v) for k, v in self.speaker_summary().items() if not v['politician']]
+            [(k, v) for k, v in list(self.speaker_summary().items()) if not v['politician']]
         )
 
     def mp_speaker_summary(self):
         """Same as speaker_summary, but only MPs."""
         return OrderedDict(
-            [(k, v) for k, v in self.speaker_summary().items() if v['politician']]
+            [(k, v) for k, v in list(self.speaker_summary().items()) if v['politician']]
         )
-    
+
     def save_activity(self):
         statements = self.statement_set.filter(procedural=False).select_related('member', 'politician')
         politicians = set([s.politician for s in statements if s.politician])
         for pol in politicians:
             topics = {}
             wordcount = 0
-            for statement in filter(lambda s: s.politician == pol, statements):
+            for statement in [s for s in statements if s.politician == pol]:
                 wordcount += statement.wordcount
                 if statement.topic in topics:
                     # If our statement is longer than the previous statement on this topic,
@@ -226,7 +226,7 @@ class Document(models.Model):
                     assert len(topics) == 1
                     if wordcount < 80:
                         continue
-                    (seq, text, url) = topics.values()[0]
+                    (seq, text, url) = list(topics.values())[0]
                     activity.save_activity({
                         'meeting': self.committeemeeting,
                         'committee': self.committeemeeting.committee,
@@ -275,7 +275,7 @@ class Document(models.Model):
         self.save()
 
 class Statement(models.Model):
-    document = models.ForeignKey(Document)
+    document = models.ForeignKey(Document, on_delete=models.CASCADE)
     time = models.DateTimeField(db_index=True)
     source_id = models.CharField(max_length=15, blank=True)
 
@@ -289,8 +289,8 @@ class Statement(models.Model):
     h2_fr = models.CharField(max_length=400, blank=True)
     h3_fr = models.CharField(max_length=400, blank=True)
 
-    member = models.ForeignKey(ElectedMember, blank=True, null=True)
-    politician = models.ForeignKey(Politician, blank=True, null=True) # a shortcut -- should == member.politician
+    member = models.ForeignKey(ElectedMember, blank=True, null=True, on_delete=models.CASCADE)
+    politician = models.ForeignKey(Politician, blank=True, null=True, on_delete=models.CASCADE) # a shortcut -- should == member.politician
     who_en = models.CharField(max_length=300, blank=True)
     who_fr = models.CharField(max_length=500, blank=True)
     who_hocid = models.PositiveIntegerField(blank=True, null=True, db_index=True)
@@ -310,10 +310,10 @@ class Statement(models.Model):
         ('R', 'Response')
     ))
     statement_type = models.CharField(max_length=35, blank=True)
-    
+
     bills = models.ManyToManyField('bills.Bill', blank=True)
     mentioned_politicians = models.ManyToManyField(Politician, blank=True, related_name='statements_with_mentions')
-        
+
     class Meta:
         ordering = ('sequence',)
         unique_together = (
@@ -332,7 +332,7 @@ class Statement(models.Model):
         if self.wordcount_en is None:
             self._generate_wordcounts()
         if ((not self.procedural) and self.wordcount <= 300
-            and ( 
+            and (
                 (parsetools.r_notamember.search(self.who) and re.search(r'(Speaker|Chair|président)', self.who))
                 or (not self.who)
                 or not any(p for p in self.content_en.split('\n') if 'class="procedural"' not in p)
@@ -342,11 +342,11 @@ class Statement(models.Model):
         if not self.urlcache:
             self.generate_url()
         super(Statement, self).save(*args, **kwargs)
-            
+
     @property
     def date(self):
         return datetime.date(self.time.year, self.time.month, self.time.day)
-    
+
     def generate_url(self):
         self.urlcache = "%s%s/" % (
             self.document.get_absolute_url(),
@@ -358,7 +358,7 @@ class Statement(models.Model):
         return self.urlcache
 
     def __unicode__ (self):
-        return u"%s speaking about %s around %s" % (self.who, self.topic, self.time)
+        return "%s speaking about %s around %s" % (self.who, self.topic, self.time)
 
     def content_floor(self):
         if not self.content_fr:
@@ -374,7 +374,7 @@ class Statement(models.Model):
                 r.append(f)
             else:
                 r.append(e)
-        return u"\n".join(r)
+        return "\n".join(r)
 
     def content_floor_if_necessary(self):
         """Returns text spoken in the original language(s), but only if that would
@@ -442,10 +442,10 @@ class Statement(models.Model):
     @property
     def topic(self):
         return self.h2
-        
+
     def to_api_dict(self, representation):
         d = dict(
-            time=unicode(self.time) if self.time else None,
+            time=str(self.time) if self.time else None,
             attribution={'en': self.who_en, 'fr': self.who_fr},
             content={'en': self.content_en, 'fr': self.content_fr},
             url=self.get_absolute_url(),
@@ -460,9 +460,9 @@ class Statement(models.Model):
                 d[h] = {'en': getattr(self, h + '_en'), 'fr': getattr(self, h + '_fr')}
         d['document_url'] = d['url'][:d['url'].rstrip('/').rfind('/')+1]
         return d
-    
+
     @property
-    @memoize_property    
+    @memoize_property
     def name_info(self):
         info = {
             'post': None,
@@ -517,7 +517,7 @@ class Statement(models.Model):
         return self.document.committeemeeting.committee.slug
 
 class OldSequenceMapping(models.Model):
-    document = models.ForeignKey(Document)
+    document = models.ForeignKey(Document, on_delete=models.CASCADE)
     sequence = models.PositiveIntegerField()
     slug = models.SlugField(max_length=100)
 
@@ -527,5 +527,5 @@ class OldSequenceMapping(models.Model):
         )
 
     def __unicode__(self):
-        return u"%s -> %s" % (self.sequence, self.slug)
-            
+        return "%s -> %s" % (self.sequence, self.slug)
+

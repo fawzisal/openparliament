@@ -20,37 +20,37 @@ from parliament.imports.hans_old.common import *
 
 r_bill = re.compile(r'[bB]ill C-(\d+)')
 class HansardParser1994(HansardParser):
-    
+
     def __init__(self, hansard, html):
-        
+
         for regex in STARTUP_RE_1994:
             html = re.sub(regex[0], regex[1], html)
 
         super(HansardParser1994, self).__init__(hansard, html)
-        
+
     def replace_bill_link(self, billmatch):
         billnumber = int(billmatch.group(1))
         try:
             bill = Bill.objects.get(sessions=self.hansard.session, number_only=billnumber)
         except Bill.DoesNotExist:
-            #print "NO BILL FOUND for %s" % billmatch.group(0)
+            #print("NO BILL FOUND for %s") % billmatch.group(0)
             return billmatch.group(0)
-        result = u'<bill id="%d" name="%s">%s</bill>' % (bill.id, escape(bill.name), "Bill C-%s" % billnumber)
-        #print "REPLACING %s with %s" % (billmatch.group(0), result)
+        result = '<bill id="%d" name="%s">%s</bill>' % (bill.id, escape(bill.name), "Bill C-%s" % billnumber)
+        #print("REPLACING %s with %s") % (billmatch.group(0), result)
         return result
-    
+
     def label_bill_links(self, txt):
         return r_bill.sub(self.replace_bill_link, txt)
-    
+
     def parse(self):
-        
+
         super(HansardParser1994, self).parse()
 
         # Initialize variables
         t = ParseTracker()
         members = []
         session = self.hansard.session
-                
+
         # Get the date
         try:
             #c = self.soup.find('h1', align=re.compile(r'CENTER', re.I)).findNext(text='HOUSE OF COMMONS').findNext(('b', 'h4'))
@@ -62,17 +62,17 @@ class HansardParser1994(HansardParser):
             raise ParseException("Couldn't navigate to date. %s" % c)
         self.date = datetime.datetime.strptime(c.string.strip(), "%A, %B %d, %Y").date()
         self.hansard.date = self.date
-        self.hansard.save()  
+        self.hansard.save()
 
         # And the time
         c = c.findNext(text=r_housemet)
         match = re.search(r_housemet, c.string)
         t['timestamp'] = self.houseTime(match.group(1), match.group(2))
         t.setNext('timestamp', t['timestamp'])
-        
+
         # Move the pointer to the start
-        c = c.next
-    
+        c = c.__next__
+
         # And start the big loop
         while c is not None:
 
@@ -92,16 +92,16 @@ class HansardParser1994(HansardParser):
                                             or c.parent.name=='ul'
                                             or c.parent.parent.name=='ul'
                                             or c.parent.parent.name=='blockquote'))
-            
-            elif c.name == 'h2' and c.has_key('align') and c['align'].lower() == 'center':
+
+            elif c.name == 'h2' and 'align' in c and c['align'].lower() == 'center':
                 # Heading
                 c = c.findNext(text=r_letter)
-                
+
                 #c = c.next
                 #if not parsetools.isString(c): raise ParseException("Expecting string right after h2")
                 t.setNext('heading', parsetools.titleIfNecessary(parsetools.tameWhitespace(c.string.strip())))
-            
-            elif (c.name == 'h3' and c.has_key('align') and c['align'].lower() == 'center') or (c.name == 'center' and (c.find('h3') or c.find('b'))):
+
+            elif (c.name == 'h3' and 'align' in c and c['align'].lower() == 'center') or (c.name == 'center' and (c.find('h3') or c.find('b'))):
                 # Topic
                 if c.find(text=r_letter):
                     c = c.find(text=r_letter)
@@ -122,16 +122,16 @@ class HansardParser1994(HansardParser):
                 c = c.nextSibling.previous
             elif c.name == 'i':
                 # Italics -- let's make sure it's inline formatting
-                if t.hasText() and c.string is not None and parsetools.isString(c.next.next) and re.search(r_notspace, c.next.next):
+                if t.hasText() and c.string is not None and parsetools.isString(c.next.__next__) and re.search(r_notspace, c.next.__next__):
                     t.appendToText(c.string, italic=True)
-                    c = c.next.next
+                    c = c.next.__next__
                     t.appendToText(c.string)
-            elif c.name == 'h5' or c.name == 'center' or (c.name == 'p' and c.has_key('align') and c['align'] == 'center'):
+            elif c.name == 'h5' or c.name == 'center' or (c.name == 'p' and 'align' in c and c['align'] == 'center'):
                 # A heading we don't care about (hopefully!)
                 if c.nextSibling is not None:
                     c = c.nextSibling.previous
-                else: 
-                    c = c.next
+                else:
+                    c = c.__next__
             elif c.name == 'table':
                 # We don't want tables, right?
                 if c.find(text=r_division):
@@ -140,17 +140,17 @@ class HansardParser1994(HansardParser):
                 if not c.find('small'):
                     if not t.ignoringText():
                         # It's not a vote, so print a debug message to make sure we're not discarding important stuff
-                        if VERBOSE: print "WARNING: Extracting table %s" % c
+                        if VERBOSE: print(("WARNING: Extracting table %s") % c)
                     if c.nextSibling:
                         c = c.nextSibling.previous
                     else:
-                        c = c.next
+                        c = c.__next__
             elif c.name == 'div':
-                if c.has_key('class') and c['class'] == 'Footer':
+                if 'class' in c and c['class'] == 'Footer':
                     # We're done!
                     self.saveStatement(t)
                     break
-            elif (c.name == 'a' and ( c.find('img', src=r_time_glyph) or (c.has_key('name') and re.search(r_timeanchor, c['name'])) )) or (c.name == 'li' and parsetools.isString(c.next) and re.search(r_time_paren, c.next)) or (c.name == 'p' and c.find(text=r_time_paren) and not c.find(text=r_letterbutnotD)):
+            elif (c.name == 'a' and ( c.find('img', src=r_time_glyph) or ('name' in c and re.search(r_timeanchor, c['name'])) )) or (c.name == 'li' and parsetools.isString(c.__next__) and re.search(r_time_paren, c.__next__)) or (c.name == 'p' and c.find(text=r_time_paren) and not c.find(text=r_letterbutnotD)):
                 # Various kinds of timestamps
                 if c.name == 'a':
                     c = c.findNext(text=r_notspace)
@@ -159,23 +159,23 @@ class HansardParser1994(HansardParser):
                 match = re.search(r_time_optionalparen, c.string)
                 if not match: raise ParseException("Couldn't match time in %s\n%s" (c, c.parent))
                 t.setNext('timestamp', parsetools.time(hour=int(match.group(1)), minute=int(match.group(2))))
-            elif c.name == 'a' and c.has_key('class') and c['class'] == 'toc':
+            elif c.name == 'a' and 'class' in c and c['class'] == 'toc':
                 # TOC link
-                c = c.next
+                c = c.__next__
             elif c.name == 'b':
                 if c.find('a'):
                     # 1. It's a page number -- ignore
-                    c = c.find('a').next
+                    c = c.find('a').__next__
                 elif c.string is not None and re.search(r_time_paren, c.string):
                     # 2. It's a timestamp
                     match = re.search(r_time_paren, c.string)
                     t.setNext('timestamp', parsetools.time(hour=int(match.group(1)), minute=int(match.group(2))))
-                    c = c.next
+                    c = c.__next__
                 elif c.string is not None and re.search(r_honorific, c.string.strip()):
                     # 3. It's the name of a new speaker
                     # Save the current buffer
                     self.saveStatement(t)
-                    
+
                     # And start wrangling. First, get the colon out
                     member = None
                     t['member_title'] = parsetools.tameWhitespace(c.string.strip())
@@ -204,7 +204,7 @@ class HansardParser1994(HansardParser):
                             if paren == 'None':
                                 # Manually labelled to not match
                                 t['member_title'].replace(' (None)', '')
-                                c = c.next.next
+                                c = c.next.__next__
                                 continue
                             # See if there's a party name; if so, strip it out
                             match = re.search(r'^(.+), (.+)$', paren)
@@ -229,12 +229,12 @@ class HansardParser1994(HansardParser):
                             # Go through the list of recent speakers and try to match
                             for possible in members:
                                 if name in possible['name']:
-                                    #print "Backreference successful: %s %s %s" % (possible['name'], name, possible['member'])
+                                    #print("Backreference successful: %s %s %s") % (possible['name'], name, possible['member'])
                                     # A match!
                                     member = possible['member']
                                     # Probably. If we have a riding, let's double-check
                                     if riding is not None and riding != possible['riding']:
-                                        if VERBOSE: print "WARNING: Name backref matched (%s, %s) but not riding (%s, %s)" % (name, possible['name'], riding, possible['riding'])
+                                        if VERBOSE: print(("WARNING: Name backref matched (%s, %s) but not riding (%s, %s)") % (name, possible['name'], riding, possible['riding']))
                                         member = None
                                     # Also double-check on gender
                                     elif gender is not None and possible['gender'] is not None and gender != possible['gender']:
@@ -255,7 +255,7 @@ class HansardParser1994(HansardParser):
                                         poss = poss.filter(Q(politician__gender=gender) | Q(politician__gender=''))
                                     if len(poss) == 1:
                                         member = poss[0]
-                                        if VERBOSE: print "WARNING: Last-name-only match for %s -- %s" % (name, member)
+                                        if VERBOSE: print(("WARNING: Last-name-only match for %s -- %s") % (name, member))
                                     else:
                                         raise ParseException( "WARNING: Backreference match failed for %s (%s)" % (name, t['member_title']) )
                         else:
@@ -275,7 +275,7 @@ class HansardParser1994(HansardParser):
                                         # We'll raise the exception later
                                         pass
                                     else:
-                                        if VERBOSE: print "WARNING: Forced match without riding for %s: %s" % (t['member_title'], pol)
+                                        if VERBOSE: print(("WARNING: Forced match without riding for %s: %s") % (t['member_title'], pol))
                                 if pol is None:
                                     raise ParseException("Couldn't match speaker: %s (%s)\nriding: %s" % (name, t['member_title'], riding))
                             except Politician.MultipleObjectsReturned:
@@ -297,14 +297,14 @@ class HansardParser1994(HansardParser):
                             if gender and pol.gender != gender and SAVE_GENDER:
                                 if pol.gender != '':
                                     raise ParseException("Gender conflict! We say %s, database says %s for %s (pol: %s)." % (gender, pol.gender, t['member_title'], pol))
-                                if VERBOSE: print "Saving gender (%s) for %s" % (gender, t['member_title'])
+                                if VERBOSE: print(("Saving gender (%s) for %s") % (gender, t['member_title']))
                                 pol.gender = gender
                                 pol.save()
-                            
+
                         # Okay! We finally have our member!
                         t['member'] = member
                         t['politician'] = member.politician
-                    c = c.next
+                    c = c.__next__
                 elif c.string is None and len(c.contents) == 0:
                     # an empty bold tag!
                     pass
@@ -314,11 +314,11 @@ class HansardParser1994(HansardParser):
                     break
                 elif hasattr(c.string, 'count') and 'Government House' in c.string:
                     # quoted letter, discard
-                    c = c.next
+                    c = c.__next__
                 else:
                     raise ParseException("Unexplained boldness! %s\n**\n%s" % (c, c.parent))
-            
+
             # Okay, so after that detour we're back at the indent level of the main for loop
             # We're also done with the possible tags we care about, so advance the cursor and loop back...
-            c = c.next
+            c = c.__next__
         return self.statements

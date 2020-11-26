@@ -1,5 +1,5 @@
 from django.contrib import messages
-from django.core import urlresolvers
+import django.urls as urlresolvers
 from django.core.exceptions import ValidationError
 from django.core.validators import EmailValidator
 from django.http import HttpResponse, HttpResponseRedirect
@@ -62,5 +62,5 @@ def token_login(request, token):
     user.log_in(request)
 
     if lt.post_login_url:
-        redirect_url = lt.post_login_url        
+        redirect_url = lt.post_login_url
     return HttpResponseRedirect(redirect_url)

@@ -1,5 +1,5 @@
 import datetime
-import urllib2
+import urllib.request, urllib.error, urllib.parse
 
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
@@ -32,11 +32,11 @@ def _get_previous_session(session):
 @transaction.atomic
 def import_bills(session):
     """Import bill data from LegisInfo for the given session.
-    
+
     session should be a Session object"""
-    
+
     previous_session = _get_previous_session(session)
-        
+
     page = 0
     fetch_next_page = True
     while fetch_next_page:
@@ -45,29 +45,29 @@ def import_bills(session):
             'sessid': session.id,
             'page': page
         }
-        tree = etree.parse(urllib2.urlopen(url))
+        tree = etree.parse(urllib.request.urlopen(url))
         bills = tree.xpath('//Bill')
         if len(bills) < 500:
             # As far as I can tell, there's no indication within the XML file of
-            # whether it's a partial or complete list, but it looks like the 
+            # whether it's a partial or complete list, but it looks like the
             # limit for one file/page is 500.
             fetch_next_page = False
 
         for lbill in bills:
             try:
                 _import_bill(lbill, session, previous_session)
-            except urllib2.HTTPError as e:
+            except urllib.error.HTTPError as e:
                 logger.error("%s %s" % (e, getattr(e, 'url', '(no url)')))
 
     return True
 
 def import_bill_by_id(legisinfo_id):
     """Imports a single bill based on its LEGISinfo id."""
-    
+
     url = LEGISINFO_SINGLE_BILL_URL % {'legisinfo_id': legisinfo_id}
     try:
-        tree = etree.parse(urllib2.urlopen(url))
-    except urllib2.HTTPError:
+        tree = etree.parse(urllib.request.urlopen(url))
+    except urllib.error.HTTPError:
         raise Bill.DoesNotExist("HTTP error retrieving bill")
     bill = tree.xpath('/Bill')
     assert len(bill) == 1
@@ -82,7 +82,7 @@ def _update(obj, field, value):
     if value is None:
         return
     if not isinstance(value, datetime.date):
-        value = unicode(value)
+        value = str(value)
     if getattr(obj, field) != value:
         setattr(obj, field, value)
         obj._changed = True
@@ -186,7 +186,7 @@ def _import_bill(lbill, session, previous_session=None):
         bill.save()
     if getattr(bis, '_changed', False):
         bis.bill = bis.bill # bizarrely, the django orm makes you do this
-        bis.save()        
+        bis.save()
 
     for levent in lbill.xpath('Events/LegislativeEvents/Event'):
         source_id = int(levent.get('id'))
@@ -214,7 +214,7 @@ def _import_bill(lbill, session, previous_session=None):
             try:
                 event.debate = Document.debates.get(session=bis.session, number=hansard_num)
             except Document.DoesNotExist:
-                logger.info(u"Could not associate BillEvent for %s with Hansard#%s" % (bill, hansard_num))
+                logger.info("Could not associate BillEvent for %s with Hansard#%s" % (bill, hansard_num))
                 continue
 
             for lcommittee in levent.xpath('Committee'):
@@ -244,7 +244,6 @@ def _import_bill(lbill, session, previous_session=None):
             )
             bill.save()  # to trigger search indexing
         except CannotScrapeException:
-            logger.warning(u"Could not get bill text for %s" % bill)
+            logger.warning("Could not get bill text for %s" % bill)
 
     return bill
-            

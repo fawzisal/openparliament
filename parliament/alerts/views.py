@@ -8,7 +8,7 @@ from django.shortcuts import get_object_or_404, render
 from django import forms
 from django.conf import settings
 from django.contrib import messages
-from django.core import urlresolvers
+import django.urls as urlresolvers
 from django.core.exceptions import PermissionDenied
 from django.core.mail import send_mail, mail_admins
 from django.core.signing import Signer, TimestampSigner, BadSignature
@@ -32,7 +32,7 @@ def politician_hansard_signup(request):
             (request.POST if request.method == 'POST' else request.GET).get('politician', '')))
     except ValueError:
         raise Http404
- 
+
     pol = get_object_or_404(Politician, pk=politician_id)
     success = False
     if request.method == 'POST':
@@ -49,7 +49,7 @@ def politician_hansard_signup(request):
                     _generate_query_for_politician(pol),
                     request.authenticated_email_user
                 )
-                messages.success(request, u"You're signed up for alerts for %s." % pol.name)
+                messages.success(request, "You're signed up for alerts for %s." % pol.name)
                 return HttpResponseRedirect(urlresolvers.reverse('alerts_list'))
 
             key = "%s,%s" % (politician_id, form.cleaned_data['email'])
@@ -61,7 +61,7 @@ def politician_hansard_signup(request):
                 'activate_url': activate_url,
             }
             t = loader.get_template("alerts/activate.txt")
-            send_mail(subject=u'Confirmation required: Email alerts about %s' % pol.name,
+            send_mail(subject='Confirmation required: Email alerts about %s' % pol.name,
                 message=t.render(activation_context, request),
                 from_email='alerts@contact.openparliament.ca',
                 recipient_list=[form.cleaned_data['email']])
@@ -74,7 +74,7 @@ def politician_hansard_signup(request):
         if request.authenticated_email:
             initial['email'] = request.authenticated_email
         form = PoliticianAlertForm(initial=initial)
-        
+
     c = {
         'form': form,
         'success': success,
@@ -156,7 +156,7 @@ class ModifyAlertView(JSONView):
 modify_alert = ModifyAlertView.as_view()
 
 def _generate_query_for_politician(pol):
-    return u'MP: "%s" Type: "debate"' % pol.identifier
+    return 'MP: "%s" Type: "debate"' % pol.identifier
 
 @disable_on_readonly_db
 def politician_hansard_subscribe(request, signed_key):
@@ -178,7 +178,7 @@ def politician_hansard_subscribe(request, signed_key):
             sub.save()
         ctx.update(
             pol=pol,
-            title=u'Email alerts for %s' % pol.name
+            title='Email alerts for %s' % pol.name
         )
     except BadSignature:
         ctx['key_error'] = True
@@ -209,7 +209,7 @@ def unsubscribe(request, key):
 def bounce_webhook(request):
     """
     Simple view to process bounce reports delivered via webhook.
-    
+
     Currently support Mandrill and Amazon SES.
     """
     sns_message_type = request.META.get('HTTP_X_AMZ_SNS_MESSAGE_TYPE')
@@ -225,7 +225,7 @@ def bounce_webhook(request):
             else:
                 mail_admins("Unhandled SES notification", request.body)
                 return HttpResponse('OK')
-            
+
             for recipient in recipients:
                 if ntype == 'Bounce' and data['bounce']['bounceType'] in ('Transient', 'Undetermined'):
                     try:

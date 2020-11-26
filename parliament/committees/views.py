@@ -1,8 +1,8 @@
 import datetime
-from urllib import urlencode
+from urllib.parse import urlencode
 
 from django.conf import settings
-from django.core import urlresolvers
+import django.urls as urlresolvers
 from django.http import HttpResponse, HttpResponsePermanentRedirect, Http404
 from django.shortcuts import get_object_or_404, render
 from django.template import loader
@@ -76,13 +76,13 @@ class CommitteeView(ModelDetailView):
         try:
             oldest_year = CommitteeMeeting.objects.filter(committee=cmte).order_by('date')[0].date.year
             newest_year = recent_meetings[0].date.year
-            meeting_years = reversed(range(oldest_year, newest_year+1))
+            meeting_years = reversed(list(range(oldest_year, newest_year+1)))
         except IndexError:
             pass
 
         title = cmte.name
         if 'Committee' not in title and not cmte.parent:
-            title += u' Committee'
+            title += ' Committee'
 
         t = loader.get_template("committees/committee_detail.html")
         c = {
@@ -93,12 +93,12 @@ class CommitteeView(ModelDetailView):
             'archive_years': meeting_years,
             'subcommittees': Committee.objects.filter(parent=cmte, display=True, sessions=Session.objects.current()),
             'include_year': newest_year != datetime.date.today().year,
-            'search_placeholder': u"Search %s transcripts" % cmte.short_name,
+            'search_placeholder': "Search %s transcripts" % cmte.short_name,
             'wordcloud_js': TextAnalysis.objects.get_wordcloud_js(
                 urlresolvers.reverse('committee_analysis', kwargs={'committee_slug': slug})),
         }
         return HttpResponse(t.render(c, request))
-committee = CommitteeView.as_view()        
+committee = CommitteeView.as_view()
 
 def committee_year_archive(request, slug, year):
     cmte = get_object_or_404(Committee, slug=slug)
@@ -113,18 +113,18 @@ def committee_year_archive(request, slug, year):
     ).distinct()
 
     return render(request, "committees/committee_year_archive.html", {
-        'title': u"%s Committee in %s" % (cmte, year),
+        'title': "%s Committee in %s" % (cmte, year),
         'committee': cmte,
         'meetings': meetings,
         'studies': studies,
         'year': year
     })
-    
+
 def committee_activity(request, activity_id):
     activity = get_object_or_404(CommitteeActivity, id=activity_id)
 
     return render(request, "committees/committee_activity.html", {
-        'title': unicode(activity),
+        'title': str(activity),
         'activity': activity,
         'meetings': activity.committeemeeting_set.order_by('-date'),
         'committee': activity.committee
@@ -235,7 +235,7 @@ class CommitteeMeetingStatementView(ModelDetailView):
         return {
             'document_speeches_url': urlresolvers.reverse('speeches') + '?' +
                 urlencode({'document': result['document_url']}),
-        }        
+        }
 
     def get_html(self, request, **kwargs):
         return committee_meeting(request, **kwargs)
